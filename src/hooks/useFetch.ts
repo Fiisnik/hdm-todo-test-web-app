@@ -1,24 +1,36 @@
 export default function useFetch() {
-  const callApi = async (method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH', route: string, data?: Record<string, any>) => {
+  const callApi = async (
+    method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH',
+    route: string,
+    data?: Record<string, any>
+  ) => {
     try {
       const myHeaders = new Headers();
 
       myHeaders.set('Accept', 'application/json');
       myHeaders.set('Content-Type', 'application/json');
 
+      const token = localStorage.getItem('token'); 
+      if (token) {
+        myHeaders.set('Authorization', `Bearer ${token}`);
+      }
+
       const requestOptions = {
         method,
         headers: myHeaders,
-        ...(data ? { body:  JSON.stringify(data) } : {}),
+        ...(data ? { body: JSON.stringify(data) } : {}), 
       };
 
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}${route}`, requestOptions);
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
       return response.json();
     } catch (error) {
       console.error(error);
-
-      return false;
+      return false; 
     }
   };
 
@@ -28,5 +40,5 @@ export default function useFetch() {
     put: (route: string, data: Record<string, any>) => callApi('PUT', route, data),
     patch: (route: string, data: Record<string, any>) => callApi('PATCH', route, data),
     delete: (route: string, data?: Record<string, any>) => callApi('DELETE', route, data),
-  }
+  };
 }

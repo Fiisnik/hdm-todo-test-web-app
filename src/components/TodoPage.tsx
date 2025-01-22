@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  User,
-  Plus,
   X,
   MoreHorizontal,
   AlertCircle,
@@ -10,9 +8,10 @@ import {
   MessageSquare,
   ChevronDown,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom'; 
 import useFetch from '../hooks/useFetch';
 import useUiToast from '../hooks/useUiToast';
-import { Task } from '../index';
+import { Task } from '../index'; 
 
 type Priority = 'High' | 'Medium' | 'Low';
 type Tag = 'To do' | 'In Progress' | 'Done';
@@ -32,6 +31,7 @@ const tagTitles: Record<Tag, string> = {
 const TodoPage = () => {
   const api = useFetch();
   const uiToast = useUiToast();
+  const navigate = useNavigate();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -42,7 +42,6 @@ const TodoPage = () => {
     priority: 'Medium',
     tag: 'To do',
   });
-
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedPriorities, setSelectedPriorities] = useState<Priority[]>([]);
@@ -53,9 +52,14 @@ const TodoPage = () => {
       (selectedPriorities.length === 0 || selectedPriorities.includes(task.priority as Priority))
   );
 
-  const handleFetchTasks = async () => {
+  const fetchTasks = async () => {
     try {
       const response = await api.get('/tasks');
+      if (!response) {
+        uiToast.error('Error fetching tasks.');
+        return;
+      }
+
       setTasks(
         Array.isArray(response)
           ? response.map((task: any) => ({
@@ -65,45 +69,49 @@ const TodoPage = () => {
           : []
       );
     } catch (error) {
-      uiToast.error('Erreur lors du chargement des tâches.');
+      if ((error as Error).message.includes('401')) {
+        navigate('/login'); 
+      } else {
+        uiToast.error('Error fetching tasks.');
+      }
     }
   };
 
   const handleAddOrEditTask = async () => {
     if (!editingTask.name || !editingTask.priority || !editingTask.tag) {
-      uiToast.error('Veuillez remplir tous les champs obligatoires.');
+      uiToast.error('Please fill all the required fields.');
       return;
     }
 
     if (editingTask.description && editingTask.description.length > 191) {
-      uiToast.error('La description ne peut pas dépasser 191 caractères.');
+      uiToast.error('Description cannot exceed 191 characters.');
       return;
     }
 
     try {
       if (editingTask.id) {
         await api.patch(`/tasks/${editingTask.id}`, editingTask);
-        uiToast.success('Tâche mise à jour avec succès !');
+        uiToast.success('Task updated successfully!');
       } else {
         await api.post('/tasks', editingTask);
-        uiToast.success('Nouvelle tâche ajoutée !');
+        uiToast.success('New task added!');
       }
 
       setShowModal(false);
       setEditingTask({ name: '', description: '', priority: 'Medium', tag: 'To do' });
-      handleFetchTasks();
+      fetchTasks();
     } catch (error) {
-      uiToast.error('Erreur lors de la sauvegarde de la tâche.');
+      uiToast.error('Error saving the task.');
     }
   };
 
   const handleDeleteTask = async (taskId: number) => {
     try {
       await api.delete(`/tasks/${taskId}`);
-      uiToast.success('Tâche supprimée avec succès !');
-      handleFetchTasks();
+      uiToast.success('Task deleted successfully!');
+      fetchTasks();
     } catch (error) {
-      uiToast.error('Erreur lors de la suppression de la tâche.');
+      uiToast.error('Error deleting the task.');
     }
   };
 
@@ -127,7 +135,16 @@ const TodoPage = () => {
   };
 
   useEffect(() => {
-    handleFetchTasks();
+    const checkAuthAndFetchTasks = async () => {
+      const token = localStorage.getItem('token'); 
+      if (!token) {
+        navigate('/login'); 
+        return;
+      }
+      await fetchTasks();
+    };
+
+    checkAuthAndFetchTasks();
   }, []);
 
   return (
@@ -232,13 +249,13 @@ const TodoPage = () => {
                             }}
                             className="block px-4 py-2 hover:bg-gray-100 w-full text-left"
                           >
-                            Éditer
+                            Edit
                           </button>
                           <button
                             onClick={() => handleDeleteTask(task.id)}
                             className="block px-4 py-2 text-red-500 hover:bg-gray-100 w-full text-left"
                           >
-                            Supprimer
+                            Delete
                           </button>
                         </div>
                       )}
@@ -254,14 +271,14 @@ const TodoPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">{editingTask.id ? 'Modifier' : 'Nouvelle tâche'}</h2>
+              <h2 className="text-xl font-semibold">{editingTask.id ? 'Edit Task' : 'New Task'}</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <input
               type="text"
-              placeholder="Nom de la tâche"
+              placeholder="Task name"
               className="w-full p-2 border rounded mb-4"
               value={editingTask.name || ''}
               onChange={(e) => setEditingTask({ ...editingTask, name: e.target.value })}
@@ -294,7 +311,7 @@ const TodoPage = () => {
               onClick={handleAddOrEditTask}
               className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
             >
-              {editingTask.id ? 'Mettre à jour' : 'Ajouter'}
+              {editingTask.id ? 'Update' : 'Add'}
             </button>
           </div>
         </div>
