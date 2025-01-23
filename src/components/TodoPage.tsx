@@ -7,11 +7,18 @@ import {
   RefreshCw,
   MessageSquare,
   ChevronDown,
+  CheckCircle,
+  AlertTriangle,
+  Calendar,
+  Users,
+  TrendingUp,
+  Clock,
+  BarChart2,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
 import useFetch from '../hooks/useFetch';
 import useUiToast from '../hooks/useUiToast';
-import { Task } from '../index'; 
+import { Task } from '../index';
 
 type Priority = 'High' | 'Medium' | 'Low';
 type Tag = 'To do' | 'In Progress' | 'Done';
@@ -70,7 +77,7 @@ const TodoPage = () => {
       );
     } catch (error) {
       if ((error as Error).message.includes('401')) {
-        navigate('/login'); 
+        navigate('/login');
       } else {
         uiToast.error('Error fetching tasks.');
       }
@@ -134,11 +141,32 @@ const TodoPage = () => {
     );
   };
 
+  const getTasksThisWeek = (): Task[] => {
+    const now = new Date();
+    const weekAgo = new Date();
+    weekAgo.setDate(now.getDate() - 7);
+    return tasks.filter((task) => {
+      const taskDate = new Date(task.updatedAt);
+      return taskDate >= weekAgo && taskDate <= now;
+    });
+  };
+
+  const getTaskProgress = (tag: Tag): number => {
+    const thisWeekTasks = getTasksThisWeek();
+    const count = thisWeekTasks.filter((task) => task.tag === tag).length;
+    return (count / tasks.length) * 100 || 0;
+  };
+
+  const getPriorityDistribution = (priority: Priority): number => {
+    const count = tasks.filter((task) => task.priority === priority).length;
+    return (count / tasks.length) * 100 || 0;
+  };
+
   useEffect(() => {
     const checkAuthAndFetchTasks = async () => {
-      const token = localStorage.getItem('token'); 
+      const token = localStorage.getItem('token');
       if (!token) {
-        navigate('/login'); 
+        navigate('/login');
         return;
       }
       await fetchTasks();
@@ -147,9 +175,19 @@ const TodoPage = () => {
     checkAuthAndFetchTasks();
   }, []);
 
+  const totalTasks = tasks.length;
+  const taskCountByPriority = tasks.reduce(
+    (acc, task) => {
+      acc[task.priority as Priority]++;
+      return acc;
+    },
+    { High: 0, Medium: 0, Low: 0 }
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
+        {/* Task List */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-8 h-8 text-red-500" />
@@ -265,8 +303,120 @@ const TodoPage = () => {
             </div>
           ))}
         </div>
+
+        {/* Dashboard */}
+        <div className="bg-white rounded-lg shadow p-6 mt-10">
+          <div className="flex items-center gap-2 mb-6">
+            <BarChart2 className="w-5 h-5 text-blue-600" />
+            <h2 className="text-xl font-bold">Dashboard Statistics</h2>
+          </div>
+          <div className="grid grid-cols-4 gap-6">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-blue-600" />
+                <h3 className="font-medium">Total Tasks</h3>
+              </div>
+              <p className="text-2xl font-bold">{totalTasks}</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <h3 className="font-medium">High Priority</h3>
+              </div>
+              <p className="text-2xl font-bold">{taskCountByPriority.High}</p>
+            </div>
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-yellow-600" />
+                <h3 className="font-medium">Medium Priority</h3>
+              </div>
+              <p className="text-2xl font-bold">{taskCountByPriority.Medium}</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-green-600" />
+                <h3 className="font-medium">Low Priority</h3>
+              </div>
+              <p className="text-2xl font-bold">{taskCountByPriority.Low}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 mt-6">
+            {/* Task Progress */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                  <h3 className="font-medium text-gray-700">Task Progress</h3>
+                </div>
+                <span className="text-sm text-gray-500">This week</span>
+              </div>
+              <div className="space-y-3">
+                {(['To do', 'In Progress', 'Done'] as Tag[]).map((tag, index) => (
+                  <div key={tag}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600">{tagTitles[tag]}</span>
+                      <span className="font-medium">
+                        {getTasksThisWeek().filter((task) => task.tag === tag).length}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${
+                          index === 0
+                            ? 'bg-purple-600'
+                            : index === 1
+                            ? 'bg-yellow-600'
+                            : 'bg-blue-600'
+                        }`}
+                        style={{
+                          width: `${getTaskProgress(tag)}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority Distribution */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-indigo-600" />
+                  <h3 className="font-medium text-gray-700">Priority Distribution</h3>
+                </div>
+                <span className="text-sm text-gray-500">All tasks</span>
+              </div>
+              <div className="space-y-3">
+                {(['High', 'Medium', 'Low'] as Priority[]).map((priority) => (
+                  <div key={priority}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600">{priority} Priority</span>
+                      <span className="font-medium">{taskCountByPriority[priority]}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${
+                          priority === 'High'
+                            ? 'bg-red-600'
+                            : priority === 'Medium'
+                            ? 'bg-yellow-600'
+                            : 'bg-green-600'
+                        }`}
+                        style={{
+                          width: `${getPriorityDistribution(priority)}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      {/* Modal */}
+
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
